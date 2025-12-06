@@ -1,4 +1,16 @@
-Django
+Django>=5.2.9
+crispy-bootstrap5
 pandas
 numpy
 matplotlib
+python-dateutil
+django-crispy-forms
+django-filter
+django-debug-toolbar
+openpyxl
+Pillow
+whitenoise
+
+# For static/images/frontend (install via npm/yarn, not pip):
+# chart.js
+# bootstrap-icons

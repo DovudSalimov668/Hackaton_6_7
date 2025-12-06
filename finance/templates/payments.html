@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Мои долги - BankMVP{% endblock %}
+{% block title %}Мои долги - Eskhata Bank{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -76,7 +76,12 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        График платежей
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="mb-0">График платежей</h2>
+                            <form method="post" action="/payments/export/">{% csrf_token %}
+                                <button class="btn btn-outline-success" type="submit"><i class="bi bi-file-earmark-excel"></i> Экспортировать в Excel</button>
+                            </form>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">

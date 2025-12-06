@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Кредитный калькулятор - BankMVP{% endblock %}
+{% block title %}Кредитный калькулятор - Eskhata Bank{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -17,46 +17,70 @@
                 Параметры кредита
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" id="calculatorForm">
                     {% csrf_token %}
-
+                    {% load crispy_forms_tags %}
+                    <!-- Add a Bootstrap switching block for graph type selection here if time. -->
+                    <!-- Use crispy layout, fallback to direct HTML if time-limited. -->
+                    <div class="mb-3">
+                        <label class="form-label">Тип графика</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="schedule_type" id="scheduleAnnuity" value="annuity" checked>
+                            <label class="btn btn-outline-primary" for="scheduleAnnuity">Аннуитетный</label>
+                            <input type="radio" class="btn-check" name="schedule_type" id="scheduleDiff" value="differentiated">
+                            <label class="btn btn-outline-success" for="scheduleDiff">Дифференцированный</label>
+                        </div>
+                        <div class="form-text">Выберите тип графика выплат</div>
+                    </div>
+                    <!-- Keep all parameters as current fields, optionally crispy-ified. Spinner, feedback and button stay same. -->
                     <div class="mb-3">
                         <label for="amount" class="form-label">Сумма кредита (₽)</label>
-                        <input type="number" class="form-control" id="amount" name="amount" value="{{ amount }}"
-                            min="100" max="500000" step="100" required>
+                        <input type="number" class="form-control" id="amount" name="amount"
+                            value="{% if amount %}{{ amount }}{% else %}100000{% endif %}" min="100" max="500000"
+                            step="100" required>
                         <small class="text-muted">От 100 до 500,000 ₽</small>
                     </div>
 
                     <div class="mb-3">
                         <label for="months" class="form-label">Срок (месяцев)</label>
-                        <input type="number" class="form-control" id="months" name="months" value="{{ months }}" min="1"
-                            max="120" step="1" required>
+                        <input type="number" class="form-control" id="months" name="months"
+                            value="{% if months %}{{ months }}{% else %}12{% endif %}" min="1" max="120" step="1"
+                            required>
                         <small class="text-muted">От 1 до 120 месяцев</small>
                     </div>
 
                     <div class="mb-3">
                         <label for="rate" class="form-label">Процентная ставка (% годовых)</label>
-                        <input type="number" class="form-control" id="rate" name="rate" value="{{ rate }}" min="1"
-                            max="35" step="0.1" required>
+                        <input type="number" class="form-control" id="rate" name="rate"
+                            value="{% if rate %}{{ rate }}{% else %}12.5{% endif %}" min="1" max="35" step="0.1"
+                            required>
                         <small class="text-muted">От 1% до 35% годовых</small>
                     </div>
 
                     <div class="mb-3">
                         <label for="one_time_commission" class="form-label">Единовременная комиссия (%)</label>
                         <input type="number" class="form-control" id="one_time_commission" name="one_time_commission"
-                            value="{{ one_time_commission }}" min="0" max="5" step="0.1">
+                            value="{% if one_time_commission %}{{ one_time_commission }}{% else %}0{% endif %}" min="0"
+                            max="5" step="0.1">
                         <small class="text-muted">От 0% до 5%</small>
                     </div>
 
                     <div class="mb-3">
                         <label for="monthly_commission" class="form-label">Ежемесячная комиссия (%)</label>
                         <input type="number" class="form-control" id="monthly_commission" name="monthly_commission"
-                            value="{{ monthly_commission }}" min="0" max="2" step="0.1">
+                            value="{% if monthly_commission %}{{ monthly_commission }}{% else %}0{% endif %}" min="0"
+                            max="2" step="0.1">
                         <small class="text-muted">От 0% до 2%</small>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100">
+                    <button type="submit" class="btn btn-primary w-100" id="submitBtn">
                         Рассчитать
+                    </button>
+                </form>
+                <form method="post" action="/calculator/export/">
+                    {% csrf_token %}
+                    <button class="btn btn-outline-success my-3" type="submit">
+                        <i class="bi bi-file-earmark-excel"></i> Экспортировать график в Excel
                     </button>
                 </form>
             </div>
@@ -204,170 +228,277 @@
 {% block extra_js %}
 {% if comparison_chart_data %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Данные для сравнительного графика
-        const comparisonData = {{ comparison_chart_data| safe
-    }};
-    const pieData = {{ pie_chart_data| safe }};
-    const remainingDebtData = {{ remaining_debt_chart_data| safe }};
+    (function () {
+        'use strict';
+
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCharts);
+        } else {
+            initCharts();
+        }
+
+        function initCharts() {
+            try {
+                // Check if Chart.js is loaded
+                if (typeof Chart === 'undefined') {
+                    console.error('Chart.js library is not loaded');
+                    return;
+                }
+
+                // Parse data with error handling
+                var comparisonData, pieData, remainingDebtData;
+
+                try {
+                    comparisonData = {{ comparison_chart_data | safe }
+                };
+                pieData = {{ pie_chart_data | safe }
+            };
+            remainingDebtData = {{ remaining_debt_chart_data | safe }
+        };
+    } catch (e) {
+        console.error('Error parsing chart data:', e);
+        return;
+    }
+
+    // Validate data
+    if (!comparisonData || !pieData || !remainingDebtData) {
+        console.error('Chart data is missing');
+        return;
+    }
 
     // 1. Pie Chart - структура переплаты
-    const pieCtx = document.getElementById('pieChart').getContext('2d');
-    new Chart(pieCtx, {
-        type: 'pie',
-        data: {
-            labels: pieData.labels,
-            datasets: [{
-                data: pieData.data,
-                backgroundColor: pieData.colors,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        font: {
-                            size: 12,
-                            family: 'Inter'
-                        },
-                        padding: 15
-                    }
+    var pieCanvas = document.getElementById('pieChart');
+    if (pieCanvas) {
+        try {
+            var pieCtx = pieCanvas.getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: pieData.labels || [],
+                    datasets: [{
+                        data: pieData.data || [],
+                        backgroundColor: pieData.colors || ['#667eea', '#fb923c', '#10b981'],
+                        borderWidth: 0
+                    }]
                 },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed.toFixed(2);
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((context.parsed / total) * 100).toFixed(1);
-                            return label + ': ' + value + ' ₽ (' + percentage + '%)';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 12,
+                                    family: 'Inter'
+                                },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    var label = context.label || '';
+                                    var value = context.parsed.toFixed(2);
+                                    var total = 0;
+
+                                    if (context.dataset && context.dataset.data) {
+                                        for (var i = 0; i < context.dataset.data.length; i++) {
+                                            total += context.dataset.data[i];
+                                        }
+                                    }
+
+                                    var percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : '0.0';
+                                    return label + ': ' + value + ' ₽ (' + percentage + '%)';
+                                }
+                            }
                         }
                     }
                 }
-            }
+            });
+        } catch (e) {
+            console.error('Error creating pie chart:', e);
         }
-    });
+    } else {
+        console.warn('Pie chart canvas not found');
+    }
 
     // 2. Line Chart - остаток долга
-    const remainingCtx = document.getElementById('remainingDebtChart').getContext('2d');
-    new Chart(remainingCtx, {
-        type: 'line',
-        data: {
-            labels: remainingDebtData.labels,
-            datasets: [{
-                label: 'Аннуитетный',
-                data: remainingDebtData.annuity,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Дифференцированный',
-                data: remainingDebtData.differentiated,
-                borderColor: '#00a651',
-                backgroundColor: 'rgba(0, 166, 81, 0.1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 11,
-                            family: 'Inter'
-                        }
-                    }
+    var remainingCanvas = document.getElementById('remainingDebtChart');
+    if (remainingCanvas) {
+        try {
+            var remainingCtx = remainingCanvas.getContext('2d');
+            new Chart(remainingCtx, {
+                type: 'line',
+                data: {
+                    labels: remainingDebtData.labels || [],
+                    datasets: [{
+                        label: 'Аннуитетный',
+                        data: remainingDebtData.annuity || [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Дифференцированный',
+                        data: remainingDebtData.differentiated || [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 166, 81, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
                 },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 11,
+                                    family: 'Inter'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) {
+                                    return value.toFixed(0) + ' ₽';
+                                }
+                            }
                         }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function (value) {
-                            return value.toFixed(0) + ' ₽';
-                        }
-                    }
-                }
-            }
+            });
+        } catch (e) {
+            console.error('Error creating remaining debt chart:', e);
         }
-    });
+    } else {
+        console.warn('Remaining debt chart canvas not found');
+    }
 
     // 3. Сравнение платежей
-    const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
-    new Chart(comparisonCtx, {
-        type: 'line',
-        data: {
-            labels: comparisonData.labels,
-            datasets: [{
-                label: 'Аннуитетный',
-                data: comparisonData.annuity,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                borderWidth: 3,
-                tension: 0.4,
-                fill: true
-            }, {
-                label: 'Дифференцированный',
-                data: comparisonData.differentiated,
-                borderColor: '#00a651',
-                backgroundColor: 'rgba(0, 166, 81, 0.1)',
-                borderWidth: 3,
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 13,
-                            family: 'Inter'
-                        }
-                    }
+    var comparisonCanvas = document.getElementById('comparisonChart');
+    if (comparisonCanvas) {
+        try {
+            var comparisonCtx = comparisonCanvas.getContext('2d');
+            new Chart(comparisonCtx, {
+                type: 'line',
+                data: {
+                    labels: comparisonData.labels || [],
+                    datasets: [{
+                        label: 'Аннуитетный',
+                        data: comparisonData.annuity || [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Дифференцированный',
+                        data: comparisonData.differentiated || [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 166, 81, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true
+                    }]
                 },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 13,
+                                    family: 'Inter'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) {
+                                    return value.toFixed(0) + ' ₽';
+                                }
+                            }
                         }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function (value) {
-                            return value.toFixed(0) + ' ₽';
-                        }
-                    }
-                }
-            }
+            });
+        } catch (e) {
+            console.error('Error creating comparison chart:', e);
         }
-    });
-});
+    } else {
+        console.warn('Comparison chart canvas not found');
+    }
+            
+        } catch (error) {
+        console.error('Error initializing charts:', error);
+    }
+    }
+
+    // Form validation and submit handling
+    var form = document.getElementById('calculatorForm');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            var submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Расчет...';
+
+                // Re-enable after 3 seconds in case of error
+                setTimeout(function () {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Рассчитать';
+                }, 3000);
+            }
+        });
+    }
+
+    // Input validation
+    var inputs = document.querySelectorAll('input[type="number"]');
+    for (var i = 0; i < inputs.length; i++) {
+        inputs[i].addEventListener('input', function () {
+            var min = parseFloat(this.min);
+            var max = parseFloat(this.max);
+            var value = parseFloat(this.value);
+
+            if (!isNaN(min) && value < min) {
+                this.value = min;
+            }
+            if (!isNaN(max) && value > max) {
+                this.value = max;
+            }
+        });
+    }
+    
+}) ();
 </script>
 {% endif %}
 {% endblock %}

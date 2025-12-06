@@ -1,11 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Анализ расходов - BankMVP{% endblock %}
+{% block title %}Анализ расходов - Eskhata Bank{% endblock %}
 
 {% block content %}
-<div class="row">
+<div class="row mb-4">
     <div class="col-12">
-        <h1 class="text-white mb-4">📊 Анализ расходов</h1>
+        <form method="get">
+            {% load crispy_forms_tags %}
+            {{ filter_form|crispy }}
+        </form>
     </div>
 </div>
 
@@ -62,7 +65,7 @@
 
     <!-- График Pie Chart -->
     <div class="col-lg-8 mb-4">
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 Распределение расходов
             </div>
@@ -70,6 +73,21 @@
                 <canvas id="expensesPieChart" style="max-height: 400px;"></canvas>
             </div>
         </div>
+        <!-- NEW: Bar chart below pie chart -->
+        <div class="card mb-3">
+            <div class="card-header">
+                ТОП-10 категорий расходов (Столбчатая диаграмма)
+            </div>
+            <div class="card-body">
+                <canvas id="expensesBarChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+        <form method="post" action="/expenses/export/">
+            {% csrf_token %}
+            <button class="btn btn-outline-success" type="submit">
+                <i class="bi bi-file-earmark-excel"></i> Экспортировать в Excel
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -78,50 +96,96 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Получаем данные из Django context
-        const chartData = {{ chart_data| safe
-    }};
+        const chartData = {{ chart_data|safe }};
 
-    // Инициализация Pie Chart
-    const ctx = document.getElementById('expensesPieChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: chartData.labels,
-            datasets: [{
-                data: chartData.data,
-                backgroundColor: chartData.colors,
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        padding: 15,
-                        font: {
-                            size: 13,
-                            family: 'Inter'
+        // Инициализация Pie Chart
+        const ctx = document.getElementById('expensesPieChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.data,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 15,
+                            font: { size: 13, family: 'Inter' }
                         }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${label}: ${value.toFixed(2)} ₽ (${percentage}%)`;
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value.toFixed(2)} ₽ (${percentage}%)`;
+                            }
                         }
                     }
                 }
             }
-        }
+        });
+
+        // NEW: Bar Chart for top-10 categories
+        const barCtx = document.getElementById('expensesBarChart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Расходы по категориям',
+                    data: chartData.data,
+                    backgroundColor: chartData.colors,
+                    borderRadius: 6,
+                    maxBarThickness: 34,
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Горизонтальная столбчатая диаграмма
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.label}: ${context.parsed.x.toFixed(2)} ₽`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Сумма (руб.)',
+                            color: '#3b3a3c',
+                            font: { size: 12, family: 'Inter', weight: 'bold' }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: false
+                        },
+                        ticks: {
+                            font: { size: 13, family: 'Inter' }
+                        }
+                    }
+                }
+            }
+        });
     });
-});
 </script>
 {% endblock %}

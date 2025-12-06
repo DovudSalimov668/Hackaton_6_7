@@ -1,0 +1,117 @@
+/* Eskhata Bank Design System */
+:root {
+    --eskhata-blue: #0055ff; /* Примерный яркий синий */
+    --eskhata-dark-blue: #0033aa;
+    --eskhata-bg: #f8f9fa;
+    --eskhata-text: #212529;
+    --eskhata-gray: #6c757d;
+    --card-radius: 20px;
+    --btn-radius: 30px; /* Сильное скругление кнопок */
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--eskhata-bg);
+    color: var(--eskhata-text);
+}
+
+/* Navbar */
+.navbar {
+    background-color: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--eskhata-blue) !important;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.navbar-nav .nav-link {
+    font-weight: 500;
+    color: #4a4a4a;
+    padding: 0.5rem 1rem;
+}
+
+.navbar-nav .nav-link.active {
+    color: var(--eskhata-blue);
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    transition: transform 0.2s ease;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    font-weight: 600;
+    padding: 1.2rem 1.5rem;
+    font-size: 1.1rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5 {
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.display-amount {
+    color: var(--eskhata-blue);
+    font-weight: 800;
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--eskhata-blue);
+    border: none;
+    border-radius: var(--btn-radius);
+    padding: 10px 24px;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(0,85,255,0.2);
+}
+
+.btn-primary:hover {
+    background-color: var(--eskhata-dark-blue);
+    box-shadow: 0 6px 15px rgba(0,85,255,0.3);
+}
+
+/* Inputs */
+.form-control, .form-select {
+    border-radius: 12px;
+    padding: 12px 15px;
+    border: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--eskhata-blue);
+    box-shadow: 0 0 0 3px rgba(0,85,255,0.1);
+    background-color: #fff;
+}
+
+/* Custom Badges */
+.badge-eskhata {
+    background-color: #ffeaea;
+    color: #ff3333;
+    border-radius: 10px;
+    padding: 5px 10px;
+}
