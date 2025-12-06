@@ -144,84 +144,115 @@ def get_overdue_payments():
 # КЕЙС 6: Кредитный калькулятор
 # ============================================
 
-def calculate_annuity_loan(amount, months, annual_rate):
+def calculate_annuity_loan(amount, months, annual_rate, one_time_commission=0, monthly_commission=0):
     """
-    Расчет аннуитетного кредита
+    Расчет аннуитетного кредита с комиссиями
     Args:
         amount: сумма кредита
         months: срок в месяцах
         annual_rate: годовая ставка в процентах
+        one_time_commission: единовременная комиссия (0-5%)
+        monthly_commission: ежемесячная комиссия (0-2%)
     Returns: список платежей по месяцам
     """
     amount = Decimal(str(amount))
     months = int(months)
+    one_time_commission = Decimal(str(one_time_commission))
+    monthly_commission = Decimal(str(monthly_commission))
     monthly_rate = Decimal(str(annual_rate)) / Decimal('100') / Decimal('12')
+    
+    # Применяем единовременную комиссию
+    commission_amount = amount * (one_time_commission / Decimal('100'))
+    loan_amount_with_commission = amount + commission_amount
     
     if monthly_rate == 0:
         # Если ставка 0%, просто делим сумму на месяцы
-        monthly_payment = amount / months
+        monthly_payment = loan_amount_with_commission / months
+        monthly_commission_amount = amount * (monthly_commission / Decimal('100'))
+        
         schedule = []
         for month in range(1, months + 1):
+            total_payment = monthly_payment + monthly_commission_amount
             schedule.append({
                 'month': month,
-                'payment': float(monthly_payment),
+                'payment': float(total_payment),
                 'principal': float(monthly_payment),
                 'interest': 0,
-                'remaining': float(amount - monthly_payment * month),
+                'monthly_commission': float(monthly_commission_amount),
+                'remaining': float(loan_amount_with_commission - monthly_payment * month),
             })
-        return schedule
+        return schedule, float(commission_amount)
     
     # Формула аннуитетного платежа
     # P = S * (r * (1 + r)^n) / ((1 + r)^n - 1)
     coefficient = (monthly_rate * (1 + monthly_rate) ** months) / ((1 + monthly_rate) ** months - 1)
-    monthly_payment = amount * coefficient
+    monthly_payment = loan_amount_with_commission * coefficient
+    
+    # Ежемесячная комиссия от исходной суммы
+    monthly_commission_amount = amount * (monthly_commission / Decimal('100'))
     
     schedule = []
-    remaining_balance = amount
+    remaining_balance = loan_amount_with_commission
     
     for month in range(1, months + 1):
         # Проценты за месяц
         interest_payment = remaining_balance * monthly_rate
         # Тело долга
         principal_payment = monthly_payment - interest_payment
+        # Общий платеж с ежемесячной комиссией
+        total_payment = monthly_payment + monthly_commission_amount
         # Остаток
         remaining_balance -= principal_payment
         
         schedule.append({
             'month': month,
-            'payment': float(monthly_payment),
+            'payment': float(total_payment),
             'principal': float(principal_payment),
             'interest': float(interest_payment),
+            'monthly_commission': float(monthly_commission_amount),
             'remaining': float(max(0, remaining_balance)),
         })
     
-    return schedule
+    return schedule, float(commission_amount)
 
 
-def calculate_differentiated_loan(amount, months, annual_rate):
+def calculate_differentiated_loan(amount, months, annual_rate, one_time_commission=0, monthly_commission=0):
     """
-    Расчет дифференцированного кредита
+    Расчет дифференцированного кредита с комиссиями
     Args:
         amount: сумма кредита
         months: срок в месяцах
         annual_rate: годовая ставка в процентах
+        one_time_commission: единовременная комиссия (0-5%)
+        monthly_commission: ежемесячная комиссия (0-2%)
     Returns: список платежей по месяцам
     """
     amount = Decimal(str(amount))
     months = int(months)
+    one_time_commission = Decimal(str(one_time_commission))
+    monthly_commission = Decimal(str(monthly_commission))
     monthly_rate = Decimal(str(annual_rate)) / Decimal('100') / Decimal('12')
     
+    # Применяем единовременную комиссию
+    commission_amount = amount * (one_time_commission / Decimal('100'))
+    loan_amount_with_commission = amount + commission_amount
+    
     # Фиксированная часть (тело долга)
-    principal_payment = amount / months
+    principal_payment = loan_amount_with_commission / months
+    
+    # Ежемесячная комиссия от исходной суммы
+    monthly_commission_amount = amount * (monthly_commission / Decimal('100'))
     
     schedule = []
-    remaining_balance = amount
+    remaining_balance = loan_amount_with_commission
     
     for month in range(1, months + 1):
         # Проценты на остаток долга
         interest_payment = remaining_balance * monthly_rate
-        # Общий платеж
-        total_payment = principal_payment + interest_payment
+        # Платеж без ежемесячной комиссии
+        base_payment = principal_payment + interest_payment
+        # Общий платеж с ежемесячной комиссией
+        total_payment = base_payment + monthly_commission_amount
         # Уменьшаем остаток
         remaining_balance -= principal_payment
         
@@ -230,32 +261,49 @@ def calculate_differentiated_loan(amount, months, annual_rate):
             'payment': float(total_payment),
             'principal': float(principal_payment),
             'interest': float(interest_payment),
+            'monthly_commission': float(monthly_commission_amount),
             'remaining': float(max(0, remaining_balance)),
         })
     
-    return schedule
+    return schedule, float(commission_amount)
 
 
-def calculate_loan_comparison(amount, months, rate):
+def calculate_loan_comparison(amount, months, rate, one_time_commission=0, monthly_commission=0):
     """
-    Сравнение двух типов кредита
+    Сравнение двух типов кредита с комиссиями
     Returns: данные для графиков сравнения
     """
-    annuity = calculate_annuity_loan(amount, months, rate)
-    differentiated = calculate_differentiated_loan(amount, months, rate)
+    annuity, annuity_one_time = calculate_annuity_loan(amount, months, rate, one_time_commission, monthly_commission)
+    differentiated, diff_one_time = calculate_differentiated_loan(amount, months, rate, one_time_commission, monthly_commission)
     
     # Общие переплаты
-    annuity_overpayment = sum(p['interest'] for p in annuity)
-    diff_overpayment = sum(p['interest'] for p in differentiated)
+    annuity_interest = sum(p['interest'] for p in annuity)
+    diff_interest = sum(p['interest'] for p in differentiated)
+    
+    # Комиссии
+    annuity_monthly_comm = sum(p['monthly_commission'] for p in annuity)
+    diff_monthly_comm = sum(p['monthly_commission'] for p in differentiated)
+    
+    # Общие переплаты включая комиссии
+    annuity_overpayment = annuity_interest + annuity_one_time + annuity_monthly_comm
+    diff_overpayment = diff_interest + diff_one_time + diff_monthly_comm
     
     return {
         'annuity': annuity,
         'differentiated': differentiated,
-        'annuity_total': sum(p['payment'] for p in annuity),
+        'annuity_total': sum(p['payment'] for p in annuity) + annuity_one_time,
         'annuity_overpayment': annuity_overpayment,
-        'diff_total': sum(p['payment'] for p in differentiated),
+        'annuity_interest': annuity_interest,
+        'annuity_one_time_commission': annuity_one_time,
+        'annuity_monthly_commission': annuity_monthly_comm,
+        'diff_total': sum(p['payment'] for p in differentiated) + diff_one_time,
         'diff_overpayment': diff_overpayment,
+        'diff_interest': diff_interest,
+        'diff_one_time_commission': diff_one_time,
+        'diff_monthly_commission': diff_monthly_comm,
+        'original_amount': float(amount),
     }
+
 
 
 # ============================================

@@ -12,124 +12,136 @@
 <div class="row">
     <!-- Ближайший платеж -->
     <div class="col-lg-6 mb-4">
-        <div class="alert alert-{{ upcoming.alert_level if upcoming else 'secondary' }} shadow">
-            <h5 class="alert-heading mb-3">
+        {% if upcoming %}
+        <div class="alert alert-{{ upcoming.alert_level }} shadow">
+            {% else %}
+            <div class="alert alert-secondary shadow">
+                {% endif %}
+                <h5 class="alert-heading mb-3">
+                    {% if upcoming %}
+                    🔔 Ближайший платеж
+                    {% else %}
+                    ✅ Нет предстоящих платежей
+                    {% endif %}
+                </h5>
                 {% if upcoming %}
-                🔔 Ближайший платеж
-                {% else %}
-                ✅ Нет предстоящих платежей
+                <p class="mb-2"><strong>Дата:</strong> {{ upcoming.payment.due_date|date:"d.m.Y" }}
+                    <span class="badge bg-{{ upcoming.alert_level }}">{{ upcoming.alert_message }}</span>
+                </p>
+                <p class="mb-2"><strong>Сумма:</strong> {{ upcoming.payment.planned_amount|floatformat:2 }} ₽</p>
+                <p class="mb-0"><strong>Описание:</strong> {{ upcoming.payment.description }}</p>
+                {% if upcoming.days_until == 1 %}
+                <hr>
+                <p class="mb-0">⚠️ <strong>Напоминание:</strong> Завтра необходимо произвести платёж!</p>
+                {% elif upcoming.days_until == 0 %}
+                <hr>
+                <p class="mb-0">🚨 <strong>Внимание:</strong> Платёж сегодня!</p>
                 {% endif %}
-            </h5>
-            {% if upcoming %}
-            <p class="mb-2"><strong>Дата:</strong> {{ upcoming.payment.due_date|date:"d.m.Y" }}
-                <span class="badge bg-{{ upcoming.alert_level }}">{{ upcoming.alert_message }}</span>
-            </p>
-            <p class="mb-2"><strong>Сумма:</strong> {{ upcoming.payment.planned_amount|floatformat:2 }} ₽</p>
-            <p class="mb-0"><strong>Описание:</strong> {{ upcoming.payment.description }}</p>
-            {% if upcoming.days_until == 1 %}
-            <hr>
-            <p class="mb-0">⚠️ <strong>Напоминание:</strong> Завтра необходимо произвести платёж!</p>
-            {% elif upcoming.days_until == 0 %}
-            <hr>
-            <p class="mb-0">🚨 <strong>Внимание:</strong> Платёж сегодня!</p>
-            {% endif %}
-            {% else %}
-            <p class="mb-0">У вас нет предстоящих платежей</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Просрочка -->
-    <div class="col-lg-6 mb-4">
-        <div class="alert alert-{{ 'danger' if overdue.count > 0 else 'success' }} shadow">
-            <h5 class="alert-heading mb-3">
-                {% if overdue.count > 0 %}
-                ⚠️ Просроченные платежи
                 {% else %}
-                ✅ Просрочек нет
+                <p class="mb-0">У вас нет предстоящих платежей</p>
                 {% endif %}
-            </h5>
-            {% if overdue.count > 0 %}
-            <p class="mb-2"><strong>Количество:</strong> {{ overdue.count }} платеж(ей)</p>
-            <p class="mb-0"><strong>Общая сумма долга:</strong>
-                <span class="badge bg-danger fs-5">{{ overdue.total_debt|floatformat:2 }} ₽</span>
-            </p>
-            <hr>
-            <p class="mb-0">🔴 Пожалуйста, погасите задолженность как можно скорее</p>
-            {% else %}
-            <p class="mb-0">Все платежи выполнены вовремя! 🎉</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- График платежей -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                График платежей
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Дата платежа</th>
-                                <th>Описание</th>
-                                <th class="text-end">Запланировано</th>
-                                <th class="text-end">Оплачено</th>
-                                <th class="text-center">Статус</th>
-                                <th class="text-center">Прогресс</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for payment in all_payments %}
-                            <tr>
-                                <td>
-                                    <strong>{{ payment.due_date|date:"d.m.Y" }}</strong>
-                                    {% if payment.is_overdue %}
-                                    <span class="badge bg-danger ms-2">Просрочено</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ payment.description }}</td>
-                                <td class="text-end">{{ payment.planned_amount|floatformat:2 }} ₽</td>
-                                <td class="text-end">{{ payment.paid_amount|floatformat:2 }} ₽</td>
-                                <td class="text-center">
-                                    {% if payment.is_paid %}
-                                    <span class="badge bg-success">Оплачено</span>
-                                    {% elif payment.is_overdue %}
-                                    <span class="badge bg-danger">Просрочка</span>
-                                    {% else %}
-                                    <span class="badge bg-warning">Не оплачено</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% with
-                                    percent=payment.paid_amount|floatformat:0|add:0|mul:100|div:payment.planned_amount|floatformat:0|add:0
-                                    %}
-                                    <div class="progress" style="height: 25px;">
-                                        <div class="progress-bar {% if payment.is_paid %}bg-success{% elif payment.is_overdue %}bg-danger{% else %}bg-warning{% endif %}"
-                                            role="progressbar" style="width: {{ percent }}%;"
-                                            aria-valuenow="{{ percent }}" aria-valuemin="0" aria-valuemax="100">
-                                            {{ percent }}%
-                                        </div>
-                                    </div>
-                                    {% endwith %}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    График платежей пуст
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        </div>
+
+        <!-- Просрочка -->
+        <div class="col-lg-6 mb-4">
+            {% if overdue.count > 0 %}
+            <div class="alert alert-danger shadow">
+                {% else %}
+                <div class="alert alert-success shadow">
+                    {% endif %}
+                    <h5 class="alert-heading mb-3">
+                        {% if overdue.count > 0 %}
+                        ⚠️ Просроченные платежи
+                        {% else %}
+                        ✅ Просрочек нет
+                        {% endif %}
+                    </h5>
+                    {% if overdue.count > 0 %}
+                    <p class="mb-2"><strong>Количество:</strong> {{ overdue.count }} платеж(ей)</p>
+                    <p class="mb-0"><strong>Общая сумма долга:</strong>
+                        <span class="badge bg-danger fs-5">{{ overdue.total_debt|floatformat:2 }} ₽</span>
+                    </p>
+                    <hr>
+                    <p class="mb-0">🔴 Пожалуйста, погасите задолженность как можно скорее</p>
+                    {% else %}
+                    <p class="mb-0">Все платежи выполнены вовремя! 🎉</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
-    </div>
-</div>
-{% endblock %}
+
+        <!-- График платежей -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        График платежей
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Дата платежа</th>
+                                        <th>Описание</th>
+                                        <th class="text-end">Запланировано</th>
+                                        <th class="text-end">Оплачено</th>
+                                        <th class="text-center">Статус</th>
+                                        <th class="text-center">Прогресс</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in all_payments %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ payment.due_date|date:"d.m.Y" }}</strong>
+                                            {% if payment.is_overdue %}
+                                            <span class="badge bg-danger ms-2">Просрочено</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ payment.description }}</td>
+                                        <td class="text-end">{{ payment.planned_amount|floatformat:2 }} ₽</td>
+                                        <td class="text-end">{{ payment.paid_amount|floatformat:2 }} ₽</td>
+                                        <td class="text-center">
+                                            {% if payment.is_paid %}
+                                            <span class="badge bg-success">Оплачено</span>
+                                            {% elif payment.is_overdue %}
+                                            <span class="badge bg-danger">Просрочка</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">Не оплачено</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% widthratio payment.paid_amount payment.planned_amount 100 as percent %}
+                                            <div class="progress" style="height: 25px;">
+                                                {% if payment.is_paid %}
+                                                <div class="progress-bar bg-success" role="progressbar"
+                                                    style="width: {{ percent }}%;">
+                                                    {% elif payment.is_overdue %}
+                                                    <div class="progress-bar bg-danger" role="progressbar"
+                                                        style="width: {{ percent }}%;">
+                                                        {% else %}
+                                                        <div class="progress-bar bg-warning" role="progressbar"
+                                                            style="width: {{ percent }}%;">
+                                                            {% endif %}
+                                                            {{ percent }}%
+                                                        </div>
+                                                    </div>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            График платежей пуст
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endblock %}

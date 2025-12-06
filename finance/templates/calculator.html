@@ -41,6 +41,20 @@
                         <small class="text-muted">От 1% до 35% годовых</small>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="one_time_commission" class="form-label">Единовременная комиссия (%)</label>
+                        <input type="number" class="form-control" id="one_time_commission" name="one_time_commission"
+                            value="{{ one_time_commission }}" min="0" max="5" step="0.1">
+                        <small class="text-muted">От 0% до 5%</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="monthly_commission" class="form-label">Ежемесячная комиссия (%)</label>
+                        <input type="number" class="form-control" id="monthly_commission" name="monthly_commission"
+                            value="{{ monthly_commission }}" min="0" max="2" step="0.1">
+                        <small class="text-muted">От 0% до 2%</small>
+                    </div>
+
                     <button type="submit" class="btn btn-primary w-100">
                         Рассчитать
                     </button>
@@ -73,6 +87,29 @@
     <div class="col-lg-8 mb-4">
         {% if annuity_schedule %}
         <!-- Графики -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        Структура переплаты
+                    </div>
+                    <div class="card-body">
+                        <canvas id="pieChart" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        Остаток долга
+                    </div>
+                    <div class="card-body">
+                        <canvas id="remainingDebtChart" style="max-height: 250px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
@@ -171,8 +208,109 @@
         // Данные для сравнительного графика
         const comparisonData = {{ comparison_chart_data| safe
     }};
+    const pieData = {{ pie_chart_data| safe }};
+    const remainingDebtData = {{ remaining_debt_chart_data| safe }};
 
-    // Сравнение платежей
+    // 1. Pie Chart - структура переплаты
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'pie',
+        data: {
+            labels: pieData.labels,
+            datasets: [{
+                data: pieData.data,
+                backgroundColor: pieData.colors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: {
+                            size: 12,
+                            family: 'Inter'
+                        },
+                        padding: 15
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.label || '';
+                            const value = context.parsed.toFixed(2);
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return label + ': ' + value + ' ₽ (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. Line Chart - остаток долга
+    const remainingCtx = document.getElementById('remainingDebtChart').getContext('2d');
+    new Chart(remainingCtx, {
+        type: 'line',
+        data: {
+            labels: remainingDebtData.labels,
+            datasets: [{
+                label: 'Аннуитетный',
+                data: remainingDebtData.annuity,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Дифференцированный',
+                data: remainingDebtData.differentiated,
+                borderColor: '#00a651',
+                backgroundColor: 'rgba(0, 166, 81, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 11,
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value.toFixed(0) + ' ₽';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 3. Сравнение платежей
     const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
     new Chart(comparisonCtx, {
         type: 'line',
@@ -189,8 +327,8 @@
             }, {
                 label: 'Дифференцированный',
                 data: comparisonData.differentiated,
-                borderColor: '#10b981',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderColor: '#00a651',
+                backgroundColor: 'rgba(0, 166, 81, 0.1)',
                 borderWidth: 3,
                 tension: 0.4,
                 fill: true

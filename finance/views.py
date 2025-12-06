@@ -63,6 +63,8 @@ class CalculatorView(TemplateView):
         context['amount'] = 100000
         context['months'] = 12
         context['rate'] = 15.0
+        context['one_time_commission'] = 0
+        context['monthly_commission'] = 0
         
         return context
     
@@ -74,18 +76,26 @@ class CalculatorView(TemplateView):
             amount = float(request.POST.get('amount', 100000))
             months = int(request.POST.get('months', 12))
             rate = float(request.POST.get('rate', 15.0))
+            one_time_commission = float(request.POST.get('one_time_commission', 0))
+            monthly_commission = float(request.POST.get('monthly_commission', 0))
             
             # Валидация
             amount = max(100, min(500000, amount))
             months = max(1, min(120, months))
             rate = max(1, min(35, rate))
+            one_time_commission = max(0, min(5, one_time_commission))
+            monthly_commission = max(0, min(2, monthly_commission))
             
             context['amount'] = amount
             context['months'] = months
             context['rate'] = rate
+            context['one_time_commission'] = one_time_commission
+            context['monthly_commission'] = monthly_commission
             
-            # Расчет обоих типов кредита
-            comparison = services.calculate_loan_comparison(amount, months, rate)
+            # Расчет обоих типов кредита с комиссиями
+            comparison = services.calculate_loan_comparison(
+                amount, months, rate, one_time_commission, monthly_commission
+            )
             
             context['annuity_schedule'] = comparison['annuity']
             context['diff_schedule'] = comparison['differentiated']
@@ -125,6 +135,27 @@ class CalculatorView(TemplateView):
                 'labels': annuity_labels,
                 'annuity': comparison_payments_annuity,
                 'differentiated': comparison_payments_diff,
+            }, ensure_ascii=False)
+            
+            # 4. Pie Chart данные - тело долга vs переплата (для аннуитета)
+            context['pie_chart_data'] = json.dumps({
+                'labels': ['Тело кредита', 'Проценты', 'Комиссии'],
+                'data': [
+                    comparison['original_amount'],
+                    comparison['annuity_interest'],
+                    comparison['annuity_one_time_commission'] + comparison['annuity_monthly_commission']
+                ],
+                'colors': ['#00a651', '#ef4444', '#ffa500']
+            }, ensure_ascii=False)
+            
+            # 5. Line Chart - остаток долга
+            annuity_remaining = [p['remaining'] for p in comparison['annuity']]
+            diff_remaining = [p['remaining'] for p in comparison['differentiated']]
+            
+            context['remaining_debt_chart_data'] = json.dumps({
+                'labels': annuity_labels,
+                'annuity': annuity_remaining,
+                'differentiated': diff_remaining,
             }, ensure_ascii=False)
             
         except (ValueError, TypeError) as e:

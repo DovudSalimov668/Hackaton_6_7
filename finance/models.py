@@ -69,7 +69,7 @@ class CurrencyRate(models.Model):
         ('EUR', 'Евро'),
     ]
     
-    date = models.DateField('Дата', unique=True)
+    date = models.DateField('Дата')
     currency_code = models.CharField('Код валюты', max_length=3, choices=CURRENCY_CHOICES)
     buy_rate = models.DecimalField('Курс покупки', max_digits=10, decimal_places=4)
     sell_rate = models.DecimalField('Курс продажи', max_digits=10, decimal_places=4)
