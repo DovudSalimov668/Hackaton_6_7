@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Анализ расходов - BankMVP{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="text-white mb-4">📊 Анализ расходов</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Статистика -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Общая сумма расходов
+            </div>
+            <div class="card-body text-center">
+                <h2 class="display-4 text-primary mb-0">{{ total_expenses|floatformat:2 }} ₽</h2>
+                <p class="text-muted mt-2">за весь период</p>
+            </div>
+        </div>
+
+        <!-- Таблица категорий -->
+        <div class="card mt-4">
+            <div class="card-header">
+                Расходы по категориям
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Категория</th>
+                                <th class="text-end">Сумма</th>
+                                <th class="text-end">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                            <tr>
+                                <td><strong>{{ category.name }}</strong></td>
+                                <td class="text-end">{{ category.amount|floatformat:2 }} ₽</td>
+                                <td class="text-end">
+                                    <span class="badge bg-primary">{{ category.percentage }}%</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">
+                                    Нет данных о транзакциях
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- График Pie Chart -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Распределение расходов
+            </div>
+            <div class="card-body">
+                <canvas id="expensesPieChart" style="max-height: 400px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Получаем данные из Django context
+        const chartData = {{ chart_data| safe
+    }};
+
+    // Инициализация Pie Chart
+    const ctx = document.getElementById('expensesPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                data: chartData.data,
+                backgroundColor: chartData.colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 13,
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value.toFixed(2)} ₽ (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

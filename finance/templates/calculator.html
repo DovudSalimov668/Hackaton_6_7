@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+
+{% block title %}Кредитный калькулятор - BankMVP{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="text-white mb-4">🧮 Кредитный калькулятор</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Форма расчета -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Параметры кредита
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Сумма кредита (₽)</label>
+                        <input type="number" class="form-control" id="amount" name="amount" value="{{ amount }}"
+                            min="100" max="500000" step="100" required>
+                        <small class="text-muted">От 100 до 500,000 ₽</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="months" class="form-label">Срок (месяцев)</label>
+                        <input type="number" class="form-control" id="months" name="months" value="{{ months }}" min="1"
+                            max="120" step="1" required>
+                        <small class="text-muted">От 1 до 120 месяцев</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="rate" class="form-label">Процентная ставка (% годовых)</label>
+                        <input type="number" class="form-control" id="rate" name="rate" value="{{ rate }}" min="1"
+                            max="35" step="0.1" required>
+                        <small class="text-muted">От 1% до 35% годовых</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        Рассчитать
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {% if annuity_schedule %}
+        <!-- Сводная информация -->
+        <div class="card mt-4">
+            <div class="card-header">
+                Сравнение графиков
+            </div>
+            <div class="card-body">
+                <h6 class="text-muted mb-3">Аннуитетный</h6>
+                <p class="mb-1"><strong>Переплата:</strong> {{ annuity_overpayment|floatformat:2 }} ₽</p>
+                <p class="mb-3"><strong>Общая сумма:</strong> {{ annuity_total|floatformat:2 }} ₽</p>
+
+                <hr>
+
+                <h6 class="text-muted mb-3">Дифференцированный</h6>
+                <p class="mb-1"><strong>Переплата:</strong> {{ diff_overpayment|floatformat:2 }} ₽</p>
+                <p class="mb-0"><strong>Общая сумма:</strong> {{ diff_total|floatformat:2 }} ₽</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Результаты -->
+    <div class="col-lg-8 mb-4">
+        {% if annuity_schedule %}
+        <!-- Графики -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        Сравнение ежемесячных платежей
+                    </div>
+                    <div class="card-body">
+                        <canvas id="comparisonChart" style="max-height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Аннуитетный график -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary">
+                        Аннуитетный график
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="sticky-top">
+                                    <tr>
+                                        <th>Мес.</th>
+                                        <th class="text-end">Платеж</th>
+                                        <th class="text-end">Тело</th>
+                                        <th class="text-end">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in annuity_schedule %}
+                                    <tr>
+                                        <td>{{ payment.month }}</td>
+                                        <td class="text-end"><strong>{{ payment.payment|floatformat:2 }}</strong></td>
+                                        <td class="text-end">{{ payment.principal|floatformat:2 }}</td>
+                                        <td class="text-end text-warning">{{ payment.interest|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Дифференцированный график -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success">
+                        Дифференцированный график
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="sticky-top">
+                                    <tr>
+                                        <th>Мес.</th>
+                                        <th class="text-end">Платеж</th>
+                                        <th class="text-end">Тело</th>
+                                        <th class="text-end">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in diff_schedule %}
+                                    <tr>
+                                        <td>{{ payment.month }}</td>
+                                        <td class="text-end"><strong>{{ payment.payment|floatformat:2 }}</strong></td>
+                                        <td class="text-end">{{ payment.principal|floatformat:2 }}</td>
+                                        <td class="text-end text-warning">{{ payment.interest|floatformat:2 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <h5 class="text-muted">👈 Введите параметры кредита и нажмите "Рассчитать"</h5>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if comparison_chart_data %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Данные для сравнительного графика
+        const comparisonData = {{ comparison_chart_data| safe
+    }};
+
+    // Сравнение платежей
+    const comparisonCtx = document.getElementById('comparisonChart').getContext('2d');
+    new Chart(comparisonCtx, {
+        type: 'line',
+        data: {
+            labels: comparisonData.labels,
+            datasets: [{
+                label: 'Аннуитетный',
+                data: comparisonData.annuity,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Дифференцированный',
+                data: comparisonData.differentiated,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 13,
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ₽';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value.toFixed(0) + ' ₽';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}Обмен валют - BankMVP{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="text-white mb-4">💱 Обмен валют</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Конвертер -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Конвертер валют
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Сумма</label>
+                        <input type="number" class="form-control" id="amount" name="amount" value="{{ amount }}"
+                            min="0.01" step="0.01" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="currency" class="form-label">Валюта</label>
+                        <select class="form-select" id="currency" name="currency">
+                            <option value="USD" {% if currency=='USD' %}selected{% endif %}>USD - Доллар США</option>
+                            <option value="EUR" {% if currency=='EUR' %}selected{% endif %}>EUR - Евро</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="operation" class="form-label">Операция</label>
+                        <select class="form-select" id="operation" name="operation">
+                            <option value="buy" {% if operation=='buy' %}selected{% endif %}>Купить валюту (банк
+                                продает)</option>
+                            <option value="sell" {% if operation=='sell' %}selected{% endif %}>Продать валюту (банк
+                                покупает)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        Конвертировать
+                    </button>
+                </form>
+
+                {% if conversion %}
+                <div class="alert alert-success mt-4">
+                    <h6 class="alert-heading">Результат</h6>
+                    <p class="mb-1">{{ conversion.amount }} {{ conversion.currency }}</p>
+                    <p class="mb-1"><small>{{ conversion.explanation }}</small></p>
+                    <hr>
+                    <h5 class="mb-0">= {{ conversion.result|floatformat:2 }} ₽</h5>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Прогноз -->
+        <div class="card mt-4">
+            <div class="card-header">
+                Прогноз на завтра
+            </div>
+            <div class="card-body">
+                {% if usd_forecast %}
+                <h6 class="text-muted mb-2">USD</h6>
+                <p class="mb-1"><strong>Покупка:</strong> {{ usd_forecast.buy_forecast }} ₽</p>
+                <p class="mb-3"><strong>Продажа:</strong> {{ usd_forecast.sell_forecast }} ₽</p>
+                {% endif %}
+
+                {% if eur_forecast %}
+                <h6 class="text-muted mb-2">EUR</h6>
+                <p class="mb-1"><strong>Покупка:</strong> {{ eur_forecast.buy_forecast }} ₽</p>
+                <p class="mb-0"><strong>Продажа:</strong> {{ eur_forecast.sell_forecast }} ₽</p>
+                {% endif %}
+
+                <hr>
+                <small class="text-muted">На основе среднего за последние 7 дней</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Графики курсов -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>История курсов</span>
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="amount" value="{{ amount }}">
+                    <input type="hidden" name="currency" value="{{ currency }}">
+                    <input type="hidden" name="operation" value="{{ operation }}">
+                    <select name="history_days" class="form-select form-select-sm d-inline w-auto"
+                        onchange="this.form.submit()">
+                        <option value="30" {% if history_days==30 %}selected{% endif %}>30 дней</option>
+                        <option value="60" {% if history_days==60 %}selected{% endif %}>60 дней</option>
+                        <option value="180" {% if history_days==180 %}selected{% endif %}>180 дней</option>
+                    </select>
+                </form>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="currencyTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="usd-tab" data-bs-toggle="tab" data-bs-target="#usd"
+                            type="button">
+                            USD - Доллар США
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="eur-tab" data-bs-toggle="tab" data-bs-target="#eur" type="button">
+                            EUR - Евро
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="currencyTabContent">
+                    <div class="tab-pane fade show active" id="usd" role="tabpanel">
+                        <canvas id="usdChart" style="max-height: 400px;"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="eur" role="tabpanel">
+                        <canvas id="eurChart" style="max-height: 400px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Получаем данные истории
+        const usdHistory = {{ usd_history| safe
+    }};
+    const eurHistory = {{ eur_history| safe }};
+
+    // График USD
+    const usdCtx = document.getElementById('usdChart').getContext('2d');
+    new Chart(usdCtx, {
+        type: 'line',
+        data: {
+            labels: usdHistory.labels,
+            datasets: [{
+                label: 'Курс покупки',
+                data: usdHistory.buy_data,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Курс продажи',
+                data: usdHistory.sell_data,
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 13,
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(4) + ' ₽';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function (value) {
+                            return value.toFixed(2) + ' ₽';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // График EUR
+    const eurCtx = document.getElementById('eurChart').getContext('2d');
+    new Chart(eurCtx, {
+        type: 'line',
+        data: {
+            labels: eurHistory.labels,
+            datasets: [{
+                label: 'Курс покупки',
+                data: eurHistory.buy_data,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Курс продажи',
+                data: eurHistory.sell_data,
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 13,
+                            family: 'Inter'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(4) + ' ₽';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function (value) {
+                            return value.toFixed(2) + ' ₽';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
